@@ -1,18 +1,78 @@
 <!doctype html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Sudoku Game</title>
-  <link rel="stylesheet" href="/static/styles.css">
-</head>
-<body>
-  <h1>Sudoku Game</h1>
-  <div id="sudoku-board"></div>
-  <div class="controls">
-    <button id="new-game">New Game</button>
-    <button id="check-solution">Check Solution</button>
-    <span id="message"></span>
-  </div>
-  <script src="/static/main.js"></script>
-</body>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sudoku Game</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+    <script src="/static/main.js" defer></script>
+  </head>
+  <body>
+    <header class="page-header">
+      <a class="brand" href="/" aria-label="Sudoku home">Sudoku</a>
+      <label class="theme-toggle" for="theme-toggle">
+        <input id="theme-toggle" type="checkbox" role="switch" />
+        <span class="theme-toggle-slider" aria-hidden="true"></span>
+        <span>Dark mode</span>
+      </label>
+    </header>
+
+    <main class="page-content">
+      <section class="game-card" aria-labelledby="game-title">
+        <div class="game-heading">
+          <div>
+            <p class="eyebrow">A little focus goes a long way</p>
+            <h1 id="game-title">Sudoku</h1>
+            <p class="subtitle">
+              Fill every row, column, and 3×3 box with 1–9.
+            </p>
+          </div>
+          <div class="timer-card">
+            <span class="timer-label">Time</span>
+            <strong id="timer" aria-live="off">00:00</strong>
+          </div>
+        </div>
+
+        <div class="game-options">
+          <label for="difficulty">Difficulty</label>
+          <select id="difficulty">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+        </div>
+
+        <div
+          id="sudoku-board"
+          class="sudoku-board"
+          role="grid"
+          aria-label="Sudoku board"
+        ></div>
+
+        <div class="controls">
+          <button id="new-game" class="button button-primary" type="button">
+            New game
+          </button>
+          <button id="check-btn" class="button button-secondary" type="button">
+            Check
+          </button>
+          <button id="hint-btn" class="button button-secondary" type="button">
+            Get a hint
+          </button>
+        </div>
+        <p id="message" class="message" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="leaderboard-card" aria-labelledby="leaderboard-title">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Personal bests</p>
+            <h2 id="leaderboard-title">Top 10 leaderboard</h2>
+          </div>
+          <span class="leaderboard-badge">Fastest times</span>
+        </div>
+        <div id="leaderboard" class="table-wrap"></div>
+      </section>
+    </main>
+  </body>
 </html>
