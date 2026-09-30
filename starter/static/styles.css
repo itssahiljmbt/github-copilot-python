@@ -13,6 +13,8 @@
   --box-border: #63718c;
   --table-stripe: #f7f9fd;
   --shadow: 0 18px 55px rgb(35 52 87 / 9%);
+  --box-shade-bg: var(--cell-alt-bg);
+  --box-plain-bg: var(--cell-bg);
 }
 
 body.dark-mode {
@@ -30,6 +32,8 @@ body.dark-mode {
   --box-border: #9aa9c3;
   --table-stripe: #202c40;
   --shadow: 0 18px 55px rgb(0 0 0 / 22%);
+  --box-shade-bg: var(--cell-alt-bg);
+  --box-plain-bg: var(--cell-bg);
 }
 
 * {
@@ -266,25 +270,12 @@ h2 {
   text-align: center;
   outline: none;
 }
-.wrong-cell {
-  background-color: #ffcccc !important; /* Light red */
-  border: 1px solid red !important;
+/* Classes for 3x3 background alternating */
+.box-shade {
+  background-color: var(--box-shade-bg);
 }
-
-/* Alternating 3×3 blocks: gray blocks at top-middle, middle-left/right, bottom-middle. */
-.sudoku-cell:nth-child(n + 4):nth-child(-n + 6),
-.sudoku-cell:nth-child(n + 13):nth-child(-n + 15),
-.sudoku-cell:nth-child(n + 22):nth-child(-n + 24),
-.sudoku-cell:nth-child(n + 28):nth-child(-n + 30),
-.sudoku-cell:nth-child(n + 37):nth-child(-n + 39),
-.sudoku-cell:nth-child(n + 46):nth-child(-n + 48),
-.sudoku-cell:nth-child(n + 34):nth-child(-n + 36),
-.sudoku-cell:nth-child(n + 43):nth-child(-n + 45),
-.sudoku-cell:nth-child(n + 52):nth-child(-n + 54),
-.sudoku-cell:nth-child(n + 58):nth-child(-n + 60),
-.sudoku-cell:nth-child(n + 67):nth-child(-n + 69),
-.sudoku-cell:nth-child(n + 76):nth-child(-n + 78) {
-  background: var(--cell-alt-bg);
+.box-plain {
+  background-color: var(--box-plain-bg);
 }
 
 /* Thicker vertical separators between 3×3 boxes. */
@@ -324,6 +315,7 @@ h2 {
   font-weight: 800;
 }
 
+/* Rely exclusively on this native incorrect class! */
 .sudoku-cell.incorrect {
   background: #ffe1e3;
   color: #b42332;
@@ -333,7 +325,33 @@ body.dark-mode .sudoku-cell.incorrect {
   background: #572e3a;
   color: #ffd6dc;
 }
+.sudoku-cell:focus {
+  position: relative;
+  z-index: 1;
+  background: rgb(83 109 254 / 17%);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
 
+.sudoku-cell.prefilled {
+  font-weight: 800;
+}
+
+.sudoku-cell.hinted {
+  color: #14805e;
+  font-weight: 800;
+}
+
+.sudoku-cell.incorrect {
+  background: #ffe1e3;
+  color: #b42332;
+  border: 1px solid #ff4d4d; /* Adds the red border seen in the reviewer's image */
+}
+
+body.dark-mode .sudoku-cell.incorrect {
+  background: #572e3a;
+  color: #ffd6dc;
+  border: 1px solid #ff7383;
+}
 .controls {
   display: flex;
   flex-wrap: wrap;
@@ -477,5 +495,16 @@ body.dark-mode .sudoku-cell.incorrect {
   .controls .button {
     flex: 1 1 40%;
     padding-inline: 10px;
+  }
+
+  /* Real-time standard Sudoku rule violations */
+  .sudoku-cell.conflict-error {
+    background-color: #fce8e6 !important;
+    color: #d32f2f !important;
+  }
+
+  body.dark-mode .sudoku-cell.conflict-error {
+    background-color: #572e3a !important;
+    color: #ff7383 !important;
   }
 }

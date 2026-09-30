@@ -1,9 +1,6 @@
 import os
-
 from flask import Flask, jsonify, render_template, request, session
-
 import sudoku_logic
-
 
 CURRENT = {
     "puzzle": None,
@@ -13,11 +10,9 @@ CURRENT = {
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key-change-me")
 
-
 @app.route("/")
 def index():
     difficulty = request.args.get("difficulty", "Medium")
-
     solved_cells = sudoku_logic.solve_board(sudoku_logic.create_empty_board())
     session["solution"] = [
         [solved_cells[row * sudoku_logic.SIZE + col]["value"]
@@ -30,7 +25,6 @@ def index():
         difficulty=difficulty,
     )
     return render_template("index.html", board=board, difficulty=difficulty)
-
 
 @app.route("/new")
 def new_game():
@@ -51,6 +45,23 @@ def new_game():
     session["solution"] = solution
     return jsonify({"puzzle": puzzle})
 
+@app.route("/api/hint", methods=["POST"])
+def get_hint():
+    solution = session.get("solution")
+    if not solution:
+        return jsonify({"error": "No game in progress"}), 400
+    
+    data = request.get_json(silent=True) or {}
+    try:
+        row = int(data.get("row"))
+        col = int(data.get("col"))
+        if not (0 <= row < sudoku_logic.SIZE and 0 <= col < sudoku_logic.SIZE):
+            raise ValueError
+        
+        # Return the exact correct number for that cell
+        return jsonify({"value": solution[row][col]})
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid coordinates"}), 400
 
 @app.route("/check", methods=["POST"])
 def check_solution():
@@ -78,12 +89,14 @@ def check_solution():
                         value = int(value)
                     except ValueError:
                         pass
-
+                else:
+                    value = 0
+            
+            # Compare user board to true solution
             if value != solution[row][col]:
                 incorrect.append({"row": row, "col": col})
 
     return jsonify(incorrect)
-
 
 if __name__ == "__main__":
     app.run(debug=True)

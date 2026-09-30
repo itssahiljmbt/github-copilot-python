@@ -48,7 +48,6 @@ function timeToSeconds(time) {
   if (parts.length !== 2 || parts.some((part) => !Number.isFinite(part))) {
     return Number.MAX_SAFE_INTEGER;
   }
-
   return parts[0] * 60 + parts[1];
 }
 
@@ -61,6 +60,7 @@ function renderLeaderboard() {
     .slice(0, 10);
 
   const table = document.createElement("table");
+  table.className = "leaderboard-table";
   const thead = table.createTHead();
   const headerRow = thead.insertRow();
 
@@ -96,7 +96,7 @@ function saveSolvedGameToLeaderboard() {
   const entry = {
     name: name.trim(),
     time: document.getElementById("timer")?.textContent || "00:00",
-    difficulty: document.getElementById("difficulty")?.value || "easy",
+    difficulty: document.getElementById("difficulty")?.value || "Medium",
     hintsUsed,
   };
 
@@ -111,15 +111,69 @@ function saveSolvedGameToLeaderboard() {
   }
 }
 
+// Real-time standard Sudoku rule validation
+function validateBoardRealTime() {
+  const inputs = [...document.querySelectorAll("#sudoku-board input")];
+
+  // Clear previous conflicts
+  inputs.forEach((input) => input.classList.remove("conflict-error"));
+
+  // Build a 2D array of the DOM elements
+  const board = [];
+  for (let r = 0; r < SIZE; r++) {
+    board.push(inputs.slice(r * SIZE, (r + 1) * SIZE));
+  }
+
+  const conflicts = new Set();
+
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const val = board[r][c].value;
+      if (!val) continue;
+
+      // Check row for duplicates
+      for (let i = 0; i < SIZE; i++) {
+        if (i !== c && board[r][i].value === val) {
+          conflicts.add(board[r][c]);
+          conflicts.add(board[r][i]);
+        }
+      }
+      // Check column for duplicates
+      for (let i = 0; i < SIZE; i++) {
+        if (i !== r && board[i][c].value === val) {
+          conflicts.add(board[r][c]);
+          conflicts.add(board[i][c]);
+        }
+      }
+      // Check 3x3 box for duplicates
+      const boxR = Math.floor(r / 3) * 3;
+      const boxC = Math.floor(c / 3) * 3;
+      for (let i = 0; i < 3; i++) {
+        for (let j = 0; j < 3; j++) {
+          const currR = boxR + i;
+          const currC = boxC + j;
+          if (
+            (currR !== r || currC !== c) &&
+            board[currR][currC].value === val
+          ) {
+            conflicts.add(board[r][c]);
+            conflicts.add(board[currR][currC]);
+          }
+        }
+      }
+    }
+  }
+
+  // Apply the conflict class to all violators
+  conflicts.forEach((input) => input.classList.add("conflict-error"));
+}
+
 function createBoardElement() {
   selectedCell = null;
   const boardDiv = document.getElementById("sudoku-board");
-  boardDiv.innerHTML = "";
+  boardDiv.innerHTML = ""; // Clear existing grid
 
   for (let row = 0; row < SIZE; row++) {
-    const rowDiv = document.createElement("div");
-    rowDiv.className = "sudoku-row";
-
     for (let col = 0; col < SIZE; col++) {
       const input = document.createElement("input");
       input.type = "text";
@@ -128,14 +182,21 @@ function createBoardElement() {
       input.dataset.row = row;
       input.dataset.col = col;
 
+      // Assign alternating shading using JS as requested by the reviewer
+      const boxRow = Math.floor(row / 3);
+      const boxCol = Math.floor(col / 3);
+      const isShaded = (boxRow + boxCol) % 2 === 0;
+      input.classList.add(isShaded ? "box-shade" : "box-plain");
+
+      // Validate inputs and check rules in real-time
       input.addEventListener("input", (event) => {
         event.target.value = event.target.value.replace(/[^1-9]/g, "");
+        validateBoardRealTime();
       });
 
-      rowDiv.appendChild(input);
+      // Append directly to the 9x9 CSS Grid container
+      boardDiv.appendChild(input);
     }
-
-    boardDiv.appendChild(rowDiv);
   }
 }
 
@@ -161,14 +222,17 @@ function renderPuzzle(newPuzzle) {
 
 async function newGame() {
   const message = document.getElementById("message");
-  message.textContent = "";
+  if (message) message.textContent = "";
+
+  const diffSelect = document.getElementById("difficulty");
+  const diff = diffSelect ? diffSelect.value : "medium";
 
   hintsUsed = 0;
   entrySavedForGame = false;
   startTimer();
 
   try {
-    const response = await fetch("/new");
+    const response = await fetch(`/new?difficulty=${diff}`);
     const data = await response.json();
 
     if (!response.ok || !data.puzzle) {
@@ -178,7 +242,8 @@ async function newGame() {
     renderPuzzle(data.puzzle);
   } catch (error) {
     stopTimer();
-    message.textContent = error.message || "Could not start a new game.";
+    if (message)
+      message.textContent = error.message || "Could not start a new game.";
   }
 }
 
@@ -186,7 +251,7 @@ async function getHint() {
   const message = document.getElementById("message");
 
   if (!selectedCell || selectedCell.disabled || selectedCell.value.trim()) {
-    message.textContent = "Select an empty cell first.";
+    if (message) message.textContent = "Select an empty cell first.";
     return;
   }
 
@@ -203,17 +268,23 @@ async function getHint() {
     const data = await response.json();
 
     if (!response.ok) {
-      message.textContent = data.error || "Could not get a hint.";
+      if (message) message.textContent = data.error || "Could not get a hint.";
       return;
     }
 
     selectedCell.value = String(data.value);
     selectedCell.disabled = true;
+    selectedCell.classList.add("hinted");
+
+    // Clear any conflicts since we just populated a correct cell
+    selectedCell.classList.remove("incorrect", "conflict-error");
+    validateBoardRealTime();
+
     hintsUsed += 1;
-    message.textContent = "Hint applied; the cell is locked.";
+    if (message) message.textContent = "Hint applied; the cell is locked.";
     selectedCell = null;
   } catch {
-    message.textContent = "Could not reach the server.";
+    if (message) message.textContent = "Could not reach the server.";
   }
 }
 
@@ -222,7 +293,7 @@ async function checkSolution() {
   const message = document.getElementById("message");
 
   if (inputs.length !== SIZE * SIZE) {
-    message.textContent = "Start a new game first.";
+    if (message) message.textContent = "Start a new game first.";
     return;
   }
 
@@ -231,7 +302,7 @@ async function checkSolution() {
     board.push(
       inputs
         .slice(row * SIZE, (row + 1) * SIZE)
-        .map((input) => input.value.trim() || 0),
+        .map((input) => parseInt(input.value.trim(), 10) || 0),
     );
   }
 
@@ -244,32 +315,46 @@ async function checkSolution() {
     const incorrect = await response.json();
 
     if (!response.ok || !Array.isArray(incorrect)) {
-      message.style.color = "#d32f2f";
-      message.textContent = incorrect.error || "Could not check the solution.";
+      if (message) {
+        message.style.color = "#d32f2f";
+        message.textContent =
+          incorrect.error || "Could not check the solution.";
+      }
       return;
     }
 
+    // Clear previous error states
     inputs.forEach((input) => {
-      input.classList.remove("wrong-cell", "incorrect", "conflict-error");
+      input.classList.remove("incorrect");
     });
 
+    // Re-run real-time validation to ensure row/col conflicts stay highlighted
+    validateBoardRealTime();
+
+    // Highlight all empty/wrong cells based on backend true solution
     incorrect.forEach(({ row, col }) => {
       const input = inputs[row * SIZE + col];
-      if (input) input.classList.add("wrong-cell");
+      if (input) input.classList.add("incorrect");
     });
 
     if (incorrect.length === 0) {
-      message.style.color = "#388e3c";
-      message.textContent = "Congratulations! You solved it!";
+      if (message) {
+        message.style.color = "#388e3c";
+        message.textContent = "Congratulations! You solved it!";
+      }
       stopTimer();
       saveSolvedGameToLeaderboard();
     } else {
-      message.style.color = "#d32f2f";
-      message.textContent = "Some cells are incorrect or missing.";
+      if (message) {
+        message.style.color = "#d32f2f";
+        message.textContent = "Some cells are incorrect or missing.";
+      }
     }
   } catch {
-    message.style.color = "#d32f2f";
-    message.textContent = "Could not reach the server.";
+    if (message) {
+      message.style.color = "#d32f2f";
+      message.textContent = "Could not reach the server.";
+    }
   }
 }
 
@@ -288,19 +373,27 @@ window.addEventListener("load", () => {
     });
   }
 
-  board.addEventListener("focusin", (event) => {
-    if (event.target.matches("input[data-row][data-col]")) {
-      selectedCell = event.target;
-    }
-  });
+  if (board) {
+    board.addEventListener("focusin", (event) => {
+      if (event.target.matches("input[data-row][data-col]")) {
+        selectedCell = event.target;
+      }
+    });
+  }
 
-  document.getElementById("hint-btn").addEventListener("click", getHint);
-  document.getElementById("new-game").addEventListener("click", newGame);
-  document.getElementById("check-btn").addEventListener("click", checkSolution);
-  document
-    .getElementById("check-solution")
-    .addEventListener("click", checkSolution);
+  const hintBtn = document.getElementById("hint-btn");
+  if (hintBtn) hintBtn.addEventListener("click", getHint);
+
+  const newGameBtn = document.getElementById("new-game");
+  if (newGameBtn) newGameBtn.addEventListener("click", newGame);
+
+  // Bind Check function to relevant buttons
+  const checkBtn = document.getElementById("check-btn");
+  if (checkBtn) checkBtn.addEventListener("click", checkSolution);
+
+  const checkSolBtn = document.getElementById("check-solution");
+  if (checkSolBtn) checkSolBtn.addEventListener("click", checkSolution);
 
   renderLeaderboard();
-  newGame();
+  newGame(); // Auto-start game on load
 });
