@@ -1,76 +1,89 @@
-from flask import Flask, render_template, jsonify, request
+import os
+
+from flask import Flask, jsonify, render_template, request, session
+
 import sudoku_logic
 
-# Keep a simple in-memory store for current puzzle and solution
-CURRENT = {
-    'puzzle': None,
-    'solution': None
-}
-app = Flask(__name__)
-@app.route('/')
-def index():
-    difficulty = request.args.get('difficulty', 'Medium')
-    board = sudoku_logic.solve_board(sudoku_logic.create_empty_board(), difficulty=difficulty)
-    return render_template('index.html', board=board, difficulty=difficulty)
 
-@app.route('/new')
+CURRENT = {
+    "puzzle": None,
+    "solution": None,
+}
+
+app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-secret-key-change-me")
+
+
+@app.route("/")
+def index():
+    difficulty = request.args.get("difficulty", "Medium")
+
+    solved_cells = sudoku_logic.solve_board(sudoku_logic.create_empty_board())
+    session["solution"] = [
+        [solved_cells[row * sudoku_logic.SIZE + col]["value"]
+         for col in range(sudoku_logic.SIZE)]
+        for row in range(sudoku_logic.SIZE)
+    ]
+
+    board = sudoku_logic.solve_board(
+        sudoku_logic.create_empty_board(),
+        difficulty=difficulty,
+    )
+    return render_template("index.html", board=board, difficulty=difficulty)
+
+
+@app.route("/new")
 def new_game():
-    difficulty = request.args.get('difficulty', 'medium').lower()
+    difficulty = request.args.get("difficulty", "medium").lower()
     clues_by_difficulty = {
-        'easy': 40,
-        'medium': 35,
-        'hard': 30,
+        "easy": 40,
+        "medium": 35,
+        "hard": 30,
     }
 
     clues = clues_by_difficulty.get(difficulty)
     if clues is None:
-        return jsonify({'error': 'Invalid difficulty'}), 400
+        return jsonify({"error": "Invalid difficulty"}), 400
 
     puzzle, solution = sudoku_logic.generate_puzzle(clues)
-    CURRENT['puzzle'] = puzzle
-    CURRENT['solution'] = solution
-    return jsonify({'puzzle': puzzle})
+    CURRENT["puzzle"] = puzzle
+    CURRENT["solution"] = solution
+    session["solution"] = solution
+    return jsonify({"puzzle": puzzle})
 
-@app.route('/check', methods=['POST'])
+
+@app.route("/check", methods=["POST"])
 def check_solution():
-    data = request.json
-    board = data.get('board')
-    solution = CURRENT.get('solution')
+    solution = session.get("solution")
     if solution is None:
-        return jsonify({'error': 'No game in progress'}), 400
-    incorrect = []
-    for i in range(sudoku_logic.SIZE):
-        for j in range(sudoku_logic.SIZE):
-            if board[i][j] != solution[i][j]:
-                incorrect.append([i, j])
-    return jsonify({'incorrect': incorrect})
+        return jsonify({"error": "No game in progress"}), 400
 
-from flask import Flask, render_template, jsonify, request
-import sudoku_logic
-
-# ...existing code...
-
-@app.post("/api/hint")
-def get_hint():
     data = request.get_json(silent=True) or {}
-    row = data.get("row")
-    col = data.get("col")
+    board = data.get("board")
+    if (
+        not isinstance(board, list)
+        or len(board) != sudoku_logic.SIZE
+        or any(not isinstance(row, list) or len(row) != sudoku_logic.SIZE for row in board)
+    ):
+        return jsonify({"error": "Board must be a 9x9 array"}), 400
 
-    if type(row) is not int or type(col) is not int:
-        return jsonify(error="Row and column must be integers."), 400
-    if not (0 <= row < sudoku_logic.SIZE and 0 <= col < sudoku_logic.SIZE):
-        return jsonify(error="Cell is out of range."), 400
+    incorrect = []
+    for row in range(sudoku_logic.SIZE):
+        for col in range(sudoku_logic.SIZE):
+            value = board[row][col]
+            if isinstance(value, str):
+                value = value.strip()
+                if value:
+                    try:
+                        value = int(value)
+                    except ValueError:
+                        pass
 
-    puzzle = CURRENT["puzzle"]
-    solution = CURRENT["solution"]
-    if puzzle is None or solution is None:
-        return jsonify(error="No game in progress. Start a new game."), 404
+            if value != solution[row][col]:
+                incorrect.append({"row": row, "col": col})
 
-    if puzzle[row][col] != sudoku_logic.EMPTY:
-        return jsonify(error="That cell is already a given."), 409
+    return jsonify(incorrect)
 
-    return jsonify(value=solution[row][col])
 
-# ...existing code...
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)

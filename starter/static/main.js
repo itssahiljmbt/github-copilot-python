@@ -226,21 +226,12 @@ async function checkSolution() {
     return;
   }
 
-  const values = inputs.map((input) => input.value.trim());
-  const isFull = values.every((value) => /^[1-9]$/.test(value));
-
-  if (!isFull) {
-    message.style.color = "#d32f2f";
-    message.textContent = "Fill in every cell before checking.";
-    return;
-  }
-
   const board = [];
   for (let row = 0; row < SIZE; row++) {
     board.push(
-      values
+      inputs
         .slice(row * SIZE, (row + 1) * SIZE)
-        .map((value) => Number.parseInt(value, 10)),
+        .map((input) => input.value.trim() || 0),
     );
   }
 
@@ -250,32 +241,31 @@ async function checkSolution() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ board }),
     });
-    const data = await response.json();
+    const incorrect = await response.json();
 
-    if (!response.ok || data.error) {
+    if (!response.ok || !Array.isArray(incorrect)) {
       message.style.color = "#d32f2f";
-      message.textContent = data.error || "Could not check the solution.";
+      message.textContent = incorrect.error || "Could not check the solution.";
       return;
     }
 
-    const incorrect = new Set(
-      (data.incorrect || []).map(([row, col]) => row * SIZE + col),
-    );
-
-    inputs.forEach((input, index) => {
-      if (input.disabled) return;
-      input.classList.remove("incorrect", "conflict-error");
-      if (incorrect.has(index)) input.classList.add("incorrect");
+    inputs.forEach((input) => {
+      input.classList.remove("wrong-cell", "incorrect", "conflict-error");
     });
 
-    if (incorrect.size === 0) {
+    incorrect.forEach(({ row, col }) => {
+      const input = inputs[row * SIZE + col];
+      if (input) input.classList.add("wrong-cell");
+    });
+
+    if (incorrect.length === 0) {
       message.style.color = "#388e3c";
       message.textContent = "Congratulations! You solved it!";
       stopTimer();
       saveSolvedGameToLeaderboard();
     } else {
       message.style.color = "#d32f2f";
-      message.textContent = "Some cells are incorrect.";
+      message.textContent = "Some cells are incorrect or missing.";
     }
   } catch {
     message.style.color = "#d32f2f";

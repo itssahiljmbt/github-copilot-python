@@ -266,6 +266,10 @@ h2 {
   text-align: center;
   outline: none;
 }
+.wrong-cell {
+  background-color: #ffcccc !important; /* Light red */
+  border: 1px solid red !important;
+}
 
 /* Alternating 3×3 blocks: gray blocks at top-middle, middle-left/right, bottom-middle. */
 .sudoku-cell:nth-child(n + 4):nth-child(-n + 6),
